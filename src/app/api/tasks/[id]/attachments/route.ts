@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { put } from "@vercel/blob";
 import { getSession } from "@/lib/auth";
 import { taskAccess } from "@/lib/access";
 import { db } from "@/lib/db";
@@ -35,13 +36,18 @@ export async function POST(
       { status: 422 },
     );
   const safe = `${randomUUID()}${path.extname(file.name).toLowerCase()}`;
-  const dir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, safe), Buffer.from(await file.arrayBuffer()));
+  const url = process.env.VERCEL
+    ? (
+        await put(`task-attachments/${id}/${safe}`, file, {
+          access: "public",
+          addRandomSuffix: true,
+        })
+      ).url
+    : await saveLocally(file, safe);
   const item = await db.attachment.create({
     data: {
       name: file.name,
-      url: `/uploads/${safe}`,
+      url,
       mimeType: file.type,
       size: file.size,
       uploaderId: s.id,
@@ -49,4 +55,11 @@ export async function POST(
     },
   });
   return NextResponse.json(item, { status: 201 });
+}
+
+async function saveLocally(file: File, safe: string) {
+  const dir = path.join(process.cwd(), "public", "uploads");
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, safe), Buffer.from(await file.arrayBuffer()));
+  return `/uploads/${safe}`;
 }
