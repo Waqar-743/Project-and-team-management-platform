@@ -209,6 +209,7 @@ export default function DashboardClient({
       {selected && (
         <TaskDrawer
           id={selected}
+          role={session.role}
           close={() => setSelected(null)}
           refresh={() => router.refresh()}
         />
@@ -896,15 +897,33 @@ function TaskModal({
     .filter((user: Data) => user.role === "TEAM_MEMBER" && user.status === "ACTIVE");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.currentTarget));
+    const form = new FormData(e.currentTarget);
+    const body = Object.fromEntries(
+      [...form.entries()].filter(([key]) => key !== "attachment"),
+    );
     const r = await fetch("/api/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
+    const task = await r.json();
     if (!r.ok) {
-      setError((await r.json()).error);
+      setError(task.error);
       return;
+    }
+    const attachment = form.get("attachment");
+    if (attachment instanceof File && attachment.size > 0) {
+      const upload = await fetch(`/api/tasks/${task.id}/attachments`, {
+        method: "POST",
+        body: new FormData(e.currentTarget),
+      });
+      if (!upload.ok) {
+        setError(
+          `Task created, but the supporting file could not be uploaded: ${(await upload.json()).error}`,
+        );
+        router.refresh();
+        return;
+      }
     }
     close();
     router.refresh();
@@ -944,9 +963,16 @@ function TaskModal({
         />
         <Field name="estimate" label="Estimated minutes" type="number" />
         <Field name="dueDate" label="Deadline" type="date" />
-        <p className="text-xs text-[#77756d]">
-          After creating the task, open it to upload a supporting file or completion proof in the Files section.
-        </p>
+        <label className="block text-sm">
+          Supporting image or document <span className="text-[#77756d]">(optional)</span>
+          <input
+            name="attachment"
+            type="file"
+            accept="image/png,image/jpeg,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="mt-2 block w-full text-xs"
+          />
+          <span className="mt-2 block text-xs text-[#77756d]">PNG, JPG, PDF, TXT or DOCX · up to 5 MB</span>
+        </label>
         {error && <p className="text-sm text-[#a0442a]">{error}</p>}
         <Submit>Create task</Submit>
       </form>
@@ -955,10 +981,12 @@ function TaskModal({
 }
 function TaskDrawer({
   id,
+  role,
   close,
   refresh,
 }: {
   id: string;
+  role: string;
   close: () => void;
   refresh: () => void;
 }) {
@@ -1012,6 +1040,29 @@ function TaskDrawer({
     }
     await reload();
   }
+  async function review(status: "DONE" | "IN_PROGRESS", form: HTMLFormElement) {
+    const response = await fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        status,
+        reviewNote: new FormData(form).get("reviewNote") || undefined,
+      }),
+    });
+    if (!response.ok) return setError((await response.json()).error);
+    await reload();
+    refresh();
+  }
+  async function reviewDeadline(requestId: string, status: "APPROVED" | "REJECTED") {
+    const response = await fetch(`/api/deadline-requests/${requestId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!response.ok) return setError((await response.json()).error);
+    await reload();
+    refresh();
+  }
   return (
     <div
       className="fixed inset-0 bg-[#191a17]/55 backdrop-blur-md z-30 flex justify-end"
@@ -1062,6 +1113,26 @@ function TaskDrawer({
                 </b>
               </div>
             </div>
+            {role !== "TEAM_MEMBER" && task.status === "IN_REVIEW" && (
+              <section className="mt-9 rounded-[18px] bg-[#e6dfd0] p-5">
+                <p className="font-mono text-[11px] tracking-[.12em] text-[#77756d]">MANAGER REVIEW</p>
+                <h3 className="font-semibold mt-2">Ready for your decision</h3>
+                <p className="text-sm text-[#77756d] mt-2">Approve completed work, or return it to the team member with clear feedback.</p>
+                <form
+                  className="mt-4 space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    review("DONE", event.currentTarget);
+                  }}
+                >
+                  <TextareaOptional name="reviewNote" label="Review note" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button className="rounded-full bg-[#262821] py-3 text-sm text-white">Approve task</button>
+                    <button type="button" onClick={(event) => review("IN_PROGRESS", event.currentTarget.form!)} className="rounded-full border border-[#a85227] py-3 text-sm text-[#a0442a]">Return for changes</button>
+                  </div>
+                </form>
+              </section>
+            )}
             <section className="mt-9">
               <h3 className="font-semibold">Checklist</h3>
               {task.subtasks.map((s: Data) => (
@@ -1103,10 +1174,11 @@ function TaskDrawer({
                 <Field name="body" label="Comment" />
               </InlineForm>
             </section>
+            {role === "TEAM_MEMBER" && (
             <section className="mt-9">
               <h3 className="font-semibold flex gap-2">
                 <Timer />
-                Log time
+                My work update
               </h3>
               <InlineForm
                 button="Save time"
@@ -1119,8 +1191,11 @@ function TaskDrawer({
                 <Field name="description" label="Work completed" />
               </InlineForm>
             </section>
+            )}
             <section className="mt-9">
-              <h3 className="font-semibold">Files</h3>
+              <h3 className="font-semibold">
+                {role === "TEAM_MEMBER" ? "Proof and deliverables" : "Task references"}
+              </h3>
               {task.attachments.map((a: Data) => (
                 <a
                   className="block text-sm py-2 text-[#a85227]"
@@ -1130,22 +1205,42 @@ function TaskDrawer({
                   {a.name} · {Math.ceil(a.size / 1024)} KB
                 </a>
               ))}
-              <InlineForm
-                button="Upload file"
-                onSubmit={(e) => upload(e.currentTarget)}
-              >
-                <label className="block text-sm">
-                  Attachment
-                  <input
-                    name="file"
-                    type="file"
-                    required
-                    className="block mt-2 text-xs"
-                  />
-                </label>
-              </InlineForm>
+              {role === "TEAM_MEMBER" && (
+                <InlineForm
+                  button="Upload proof"
+                  onSubmit={(e) => upload(e.currentTarget)}
+                >
+                  <label className="block text-sm">
+                    Completion proof or supporting file
+                    <input
+                      name="file"
+                      type="file"
+                      required
+                      className="block mt-2 text-xs"
+                    />
+                  </label>
+                </InlineForm>
+              )}
             </section>
-            {task.dueDate && (
+            {role !== "TEAM_MEMBER" && task.deadlineExtensions.length > 0 && (
+              <section className="mt-9">
+                <h3 className="font-semibold">Deadline requests</h3>
+                <p className="text-sm text-[#77756d] mt-1">Review requests made by project members.</p>
+                {task.deadlineExtensions.map((request: Data) => (
+                  <div key={request.id} className="mt-4 rounded-xl border border-[#d9d3c5] p-4 text-sm">
+                    <p><b>{request.requester.name}</b> requested {new Date(request.requestedDate).toLocaleDateString("en-GB", { timeZone: "UTC" })}</p>
+                    <p className="mt-2 text-[#77756d]">{request.reason}</p>
+                    {request.status === "PENDING" ? (
+                      <div className="mt-4 flex gap-3">
+                        <button onClick={() => reviewDeadline(request.id, "APPROVED")} className="rounded-full bg-[#262821] px-4 py-2 text-xs text-white">Approve</button>
+                        <button onClick={() => reviewDeadline(request.id, "REJECTED")} className="rounded-full border border-[#a85227] px-4 py-2 text-xs text-[#a0442a]">Decline</button>
+                      </div>
+                    ) : <p className="mt-3 text-xs font-medium">{label(request.status)}</p>}
+                  </div>
+                ))}
+              </section>
+            )}
+            {role === "TEAM_MEMBER" && task.dueDate && (
               <section className="mt-9">
                 <h3 className="font-semibold">Request more time</h3>
                 <InlineForm
@@ -1179,8 +1274,8 @@ function Modal({
       className="fixed inset-0 bg-[#191a17]/65 backdrop-blur-md z-30 grid place-items-center p-4"
       onMouseDown={(e) => e.currentTarget === e.target && close()}
     >
-      <div className="w-full max-w-lg rounded-[26px] bg-[#f3f0e8] p-7 rise">
-        <button onClick={close} className="float-right">
+      <div className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[26px] bg-[#f3f0e8] p-5 sm:p-7 rise">
+        <button onClick={close} aria-label="Close dialog" className="float-right sticky top-0 z-10 rounded-full bg-[#f3f0e8] p-1">
           <X />
         </button>
         {children}
@@ -1217,6 +1312,18 @@ function Textarea({ name, label: fieldLabel }: { name: string; label: string }) 
         name={name}
         required
         rows={4}
+        className="mt-2 w-full resize-y rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3 outline-none focus:ring-2 focus:ring-[#c66a31]"
+      />
+    </label>
+  );
+}
+function TextareaOptional({ name, label: fieldLabel }: { name: string; label: string }) {
+  return (
+    <label className="block text-sm">
+      {fieldLabel} <span className="text-[#77756d]">(optional)</span>
+      <textarea
+        name={name}
+        rows={3}
         className="mt-2 w-full resize-y rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3 outline-none focus:ring-2 focus:ring-[#c66a31]"
       />
     </label>

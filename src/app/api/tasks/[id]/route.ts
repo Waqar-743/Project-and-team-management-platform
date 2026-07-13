@@ -35,7 +35,13 @@ export async function GET(
             dependsOn: { select: { id: true, title: true, status: true } },
           },
         },
-        deadlineExtensions: true,
+        deadlineExtensions: {
+          include: {
+            requester: { select: { id: true, name: true } },
+            reviewer: { select: { id: true, name: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
         attachments: true,
       },
     }),
