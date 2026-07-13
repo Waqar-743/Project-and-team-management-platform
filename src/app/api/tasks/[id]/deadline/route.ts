@@ -21,9 +21,17 @@ export async function POST(
       { status: 404 },
     );
   const p = schema.safeParse(await req.json().catch(() => null));
-  if (!p.success || p.data.requestedDate <= task.dueDate)
+  if (!p.success)
     return NextResponse.json(
-      { error: "New deadline must be later and include a reason" },
+      {
+        error: "Choose a new deadline and provide an extension reason of at least 10 characters",
+        fields: p.error.flatten().fieldErrors,
+      },
+      { status: 422 },
+    );
+  if (p.data.requestedDate <= task.dueDate)
+    return NextResponse.json(
+      { error: "Requested deadline must be later than the current task deadline" },
       { status: 422 },
     );
   const item = await db.deadlineExtension.create({

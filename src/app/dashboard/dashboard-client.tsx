@@ -897,7 +897,8 @@ function TaskModal({
     .filter((user: Data) => user.role === "TEAM_MEMBER" && user.status === "ACTIVE");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
+    const formElement = e.currentTarget;
+    const form = new FormData(formElement);
     const body = Object.fromEntries(
       [...form.entries()].filter(([key]) => key !== "attachment"),
     );
@@ -915,7 +916,7 @@ function TaskModal({
     if (attachment instanceof File && attachment.size > 0) {
       const upload = await fetch(`/api/tasks/${task.id}/attachments`, {
         method: "POST",
-        body: new FormData(e.currentTarget),
+        body: new FormData(formElement),
       });
       if (!upload.ok) {
         setError(
@@ -992,6 +993,11 @@ function TaskDrawer({
 }) {
   const [task, setTask] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const subtasks = task?.subtasks ?? [];
+  const comments = task?.comments ?? [];
+  const attachments = task?.attachments ?? [];
+  const deadlineExtensions = task?.deadlineExtensions ?? [];
+  const timeEntries = task?.timeEntries ?? [];
   async function reload() {
     setTask(await fetch(`/api/tasks/${id}`).then((x) => x.json()));
   }
@@ -1105,7 +1111,7 @@ function TaskDrawer({
               <div className="core p-4">
                 <p className="text-xs text-[#77756d]">Logged</p>
                 <b className="font-mono">
-                  {task.timeEntries.reduce(
+                  {timeEntries.reduce(
                     (a: number, x: Data) => a + x.minutes,
                     0,
                   )}{" "}
@@ -1135,7 +1141,7 @@ function TaskDrawer({
             )}
             <section className="mt-9">
               <h3 className="font-semibold">Checklist</h3>
-              {task.subtasks.map((s: Data) => (
+              {subtasks.map((s: Data) => (
                 <label
                   className="text-sm py-3 border-b border-[#d9d3c5]"
                   key={s.id}
@@ -1161,7 +1167,7 @@ function TaskDrawer({
                 <ChatCircle />
                 Discussion
               </h3>
-              {task.comments.map((c: Data) => (
+              {comments.map((c: Data) => (
                 <div key={c.id} className="py-4 border-b border-[#d9d3c5]">
                   <b className="text-sm">{c.author.name}</b>
                   <p className="text-sm mt-1">{c.body}</p>
@@ -1196,7 +1202,7 @@ function TaskDrawer({
               <h3 className="font-semibold">
                 {role === "TEAM_MEMBER" ? "Proof and deliverables" : "Task references"}
               </h3>
-              {task.attachments.map((a: Data) => (
+              {attachments.map((a: Data) => (
                 <a
                   className="block text-sm py-2 text-[#a85227]"
                   href={a.url}
@@ -1222,11 +1228,11 @@ function TaskDrawer({
                 </InlineForm>
               )}
             </section>
-            {role !== "TEAM_MEMBER" && task.deadlineExtensions.length > 0 && (
+            {role !== "TEAM_MEMBER" && deadlineExtensions.length > 0 && (
               <section className="mt-9">
                 <h3 className="font-semibold">Deadline requests</h3>
                 <p className="text-sm text-[#77756d] mt-1">Review requests made by project members.</p>
-                {task.deadlineExtensions.map((request: Data) => (
+                {deadlineExtensions.map((request: Data) => (
                   <div key={request.id} className="mt-4 rounded-xl border border-[#d9d3c5] p-4 text-sm">
                     <p><b>{request.requester.name}</b> requested {new Date(request.requestedDate).toLocaleDateString("en-GB", { timeZone: "UTC" })}</p>
                     <p className="mt-2 text-[#77756d]">{request.reason}</p>
@@ -1251,8 +1257,13 @@ function TaskDrawer({
                     name="requestedDate"
                     label="Requested date"
                     type="date"
+                    min={new Date(
+                      new Date(task.dueDate).getTime() + 86400000,
+                    )
+                      .toISOString()
+                      .slice(0, 10)}
                   />
-                  <Field name="reason" label="Reason" />
+                  <Textarea name="reason" label="Reason for extension (at least 10 characters)" />
                 </InlineForm>
               </section>
             )}
@@ -1287,10 +1298,12 @@ function Field({
   name,
   label: fieldLabel,
   type = "text",
+  min,
 }: {
   name: string;
   label: string;
   type?: string;
+  min?: string;
 }) {
   return (
     <label className="block text-sm">
@@ -1298,6 +1311,7 @@ function Field({
       <input
         name={name}
         type={type}
+        min={min}
         required
         className="mt-2 w-full rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3 outline-none focus:ring-2 focus:ring-[#c66a31]"
       />
