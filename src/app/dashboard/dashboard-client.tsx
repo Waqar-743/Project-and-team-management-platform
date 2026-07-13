@@ -966,6 +966,7 @@ function TaskDrawer({
 }) {
   const [task, setTask] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const subtasks = task?.subtasks ?? [];
   const comments = task?.comments ?? [];
   const deadlineExtensions = task?.deadlineExtensions ?? [];
@@ -980,6 +981,8 @@ function TaskDrawer({
       .catch(() => setError("Task details could not be loaded."));
   }, [id]);
   async function post(path: string, form: HTMLFormElement) {
+    setError("");
+    setNotice("");
     const body = Object.fromEntries(new FormData(form));
     const r = await fetch(`/api/tasks/${id}/${path}`, {
       method: "POST",
@@ -993,6 +996,15 @@ function TaskDrawer({
     await reload();
     form.reset();
     refresh();
+    setNotice(
+      path === "deadline"
+        ? "Deadline extension request sent. Your project manager will review it."
+        : path === "time"
+          ? "Work update saved."
+          : path === "comments"
+            ? "Comment posted."
+            : "Checklist item added.",
+    );
   }
   async function toggleSubtask(item: Data) {
     const r = await fetch(`/api/subtasks/${item.id}`, {
@@ -1020,6 +1032,8 @@ function TaskDrawer({
     refresh();
   }
   async function reviewDeadline(requestId: string, status: "APPROVED" | "REJECTED") {
+    setError("");
+    setNotice("");
     const response = await fetch(`/api/deadline-requests/${requestId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -1028,6 +1042,11 @@ function TaskDrawer({
     if (!response.ok) return setError((await response.json()).error);
     await reload();
     refresh();
+    setNotice(
+      status === "APPROVED"
+        ? "Deadline request approved and the task deadline was updated."
+        : "Deadline request declined. The team member has been notified.",
+    );
   }
   return (
     <div
@@ -1041,6 +1060,11 @@ function TaskDrawer({
         {error && (
           <p role="alert" className="text-sm text-[#a0442a] mb-4">
             {error}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="mb-4 rounded-xl bg-[#e1e8d8] px-4 py-3 text-sm text-[#3f5637]">
+            {notice}
           </p>
         )}
         {!task ? (
@@ -1209,6 +1233,11 @@ function TaskDrawer({
             {role === "TEAM_MEMBER" && task.dueDate && (
               <section className="mt-9">
                 <h3 className="font-semibold">Request more time</h3>
+                {deadlineExtensions.some((request: Data) => request.status === "PENDING") && (
+                  <p className="mt-2 rounded-xl bg-[#eee9de] px-3 py-2 text-xs text-[#77756d]">
+                    A request is awaiting your project manager’s decision.
+                  </p>
+                )}
                 <InlineForm
                   button="Request extension"
                   onSubmit={(e) => post("deadline", e.currentTarget)}

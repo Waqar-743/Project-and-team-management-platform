@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Role } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { taskAccess } from "@/lib/access";
 import { db } from "@/lib/db";
@@ -13,6 +14,11 @@ export async function POST(
 ) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (s.role !== Role.TEAM_MEMBER)
+    return NextResponse.json(
+      { error: "Only the assigned team member can request a deadline extension" },
+      { status: 403 },
+    );
   const { id } = await params;
   const task = await taskAccess(s, id);
   if (!task || !task.dueDate)
