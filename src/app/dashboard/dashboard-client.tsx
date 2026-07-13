@@ -37,6 +37,7 @@ export default function DashboardClient({
   projects,
   tasks: initialTasks,
   users,
+  assignableUsers,
   activities,
   notifications,
   auditCount,
@@ -45,6 +46,7 @@ export default function DashboardClient({
   projects: Data[];
   tasks: Data[];
   users: Data[];
+  assignableUsers: Data[];
   activities: Data[];
   notifications: Data[];
   auditCount: number;
@@ -185,10 +187,15 @@ export default function DashboardClient({
           />
         )}{" "}
         {view === "projects" && (
-          <Projects projects={projects} users={users} role={session.role} />
+          <Projects
+            projects={projects}
+            users={users}
+            assignableUsers={assignableUsers}
+            role={session.role}
+          />
         )}{" "}
         {view === "tasks" && (
-          <Board tasks={tasks} move={move} open={setSelected} />
+          <Board tasks={tasks} move={move} open={setSelected} role={session.role} />
         )}{" "}
         {view === "team" && <Team users={users} />}{" "}
         {view === "reports" && <Reports />}
@@ -196,7 +203,6 @@ export default function DashboardClient({
       {createOpen && (
         <TaskModal
           projects={projects}
-          users={users}
           close={() => setCreateOpen(false)}
         />
       )}{" "}
@@ -284,7 +290,9 @@ function Overview({
       <div className="grid lg:grid-cols-[1.4fr_.6fr] gap-8 mt-10">
         <section>
           <div className="flex justify-between mb-4">
-            <h2 className="font-semibold text-lg">Active projects</h2>
+            <h2 className="font-semibold text-lg">
+              {role === "TEAM_MEMBER" ? "My assigned projects" : "Active projects"}
+            </h2>
             <button onClick={projectsView} className="text-xs text-[#77756d]">
               View all
             </button>
@@ -354,14 +362,17 @@ function Metric({
 function Projects({
   projects,
   users,
+  assignableUsers,
   role,
 }: {
   projects: Data[];
   users: Data[];
+  assignableUsers: Data[];
   role: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [staffing, setStaffing] = useState<Data | null>(null);
   const [error, setError] = useState("");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -381,12 +392,14 @@ function Projects({
     <div>
       <div className="flex justify-between items-end">
         <Heading eyebrow="PORTFOLIO">Projects in motion.</Heading>
-        <button
-          onClick={() => setOpen(true)}
-          className="rounded-full bg-[#262821] text-white px-5 py-3 text-sm"
-        >
-          New project
-        </button>
+        {role !== "TEAM_MEMBER" && (
+          <button
+            onClick={() => setOpen(true)}
+            className="rounded-full bg-[#262821] text-white px-5 py-3 text-sm"
+          >
+            New project
+          </button>
+        )}
       </div>
       <div className="grid lg:grid-cols-2 gap-5 mt-12">
         {projects.map((p, i) => (
@@ -399,7 +412,16 @@ function Projects({
                 <span className="font-mono text-xs text-[#8a8376]">
                   {p.code}
                 </span>
-                <ArrowUpRight size={20} />
+                {role !== "TEAM_MEMBER" ? (
+                  <button
+                    onClick={() => setStaffing(p)}
+                    className="flex items-center gap-1 text-xs text-[#a85227]"
+                  >
+                    Manage team <ArrowUpRight size={17} />
+                  </button>
+                ) : (
+                  <ArrowUpRight size={20} />
+                )}
               </div>
               <h2 className="text-2xl tracking-[-.04em] font-semibold mt-7">
                 {p.name}
@@ -447,23 +469,137 @@ function Projects({
           </form>
         </Modal>
       )}
+      {staffing && (
+        <ProjectTeamModal
+          project={staffing}
+          candidates={assignableUsers}
+          close={() => setStaffing(null)}
+          refresh={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }
+function ProjectTeamModal({
+  project,
+  candidates,
+  close,
+  refresh,
+}: {
+  project: Data;
+  candidates: Data[];
+  close: () => void;
+  refresh: () => void;
+}) {
+  const [error, setError] = useState("");
+  const memberIds = new Set(project.members.map((m: Data) => m.user.id));
+  const available = candidates.filter((user) => !memberIds.has(user.id));
+  async function add(form: HTMLFormElement) {
+    const userId = new FormData(form).get("userId");
+    const response = await fetch(`/api/projects/${project.id}/members`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (!response.ok) return setError((await response.json()).error);
+    refresh();
+    close();
+  }
+  async function remove(userId: string) {
+    const response = await fetch(`/api/projects/${project.id}/members`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (!response.ok) return setError((await response.json()).error);
+    refresh();
+    close();
+  }
+  return (
+    <Modal close={close}>
+      <p className="font-mono text-xs text-[#77756d]">PROJECT TEAM</p>
+      <h2 className="text-2xl font-semibold mt-3">Staff {project.name}</h2>
+      <p className="text-sm text-[#77756d] mt-3">
+        Add an active team member here before assigning them work. This keeps project access and task ownership aligned.
+      </p>
+      <div className="mt-6 divide-y divide-[#d9d3c5]">
+        {project.members.map((member: Data) => (
+          <div key={member.user.id} className="flex items-center justify-between py-3 text-sm">
+            <div>
+              <p className="font-medium">{member.user.name}</p>
+              <p className="text-xs text-[#77756d]">{label(member.user.role)}</p>
+            </div>
+            {member.user.role === "TEAM_MEMBER" && (
+              <button onClick={() => remove(member.user.id)} className="text-xs text-[#a0442a]">
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {available.length ? (
+        <form
+          className="flex gap-2 mt-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            add(event.currentTarget);
+          }}
+        >
+          <select name="userId" className="min-w-0 flex-1 rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3 text-sm">
+            {available.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}{user.title ? ` — ${user.title}` : ""}
+              </option>
+            ))}
+          </select>
+          <button className="rounded-xl bg-[#262821] px-4 text-sm text-white">Add</button>
+        </form>
+      ) : (
+        <p className="mt-6 text-sm text-[#77756d]">All active team members are already assigned.</p>
+      )}
+      {error && <p role="alert" className="mt-4 text-sm text-[#a0442a]">{error}</p>}
+    </Modal>
+  );
+}
+
 function Board({
   tasks,
   move,
   open,
+  role,
 }: {
   tasks: Data[];
   move: (id: string, s: string) => void;
   open: (id: string) => void;
+  role: string;
 }) {
+  const permitted = (from: string) => {
+    if (role === "ADMIN") return STATUSES;
+    if (role === "TEAM_MEMBER")
+      return {
+        TODO: ["TODO", "IN_PROGRESS", "BLOCKED"],
+        IN_PROGRESS: ["IN_PROGRESS", "IN_REVIEW", "BLOCKED"],
+        BLOCKED: ["BLOCKED", "IN_PROGRESS"],
+        IN_REVIEW: ["IN_REVIEW"],
+        BACKLOG: ["BACKLOG"],
+        DONE: ["DONE"],
+      }[from] || [from];
+    return {
+      BACKLOG: ["BACKLOG", "TODO", "BLOCKED"],
+      TODO: ["TODO", "BACKLOG", "IN_PROGRESS", "BLOCKED"],
+      IN_PROGRESS: ["IN_PROGRESS", "TODO", "IN_REVIEW", "BLOCKED"],
+      IN_REVIEW: ["IN_REVIEW", "IN_PROGRESS", "DONE", "BLOCKED"],
+      BLOCKED: ["BLOCKED", "TODO", "IN_PROGRESS"],
+      DONE: ["DONE", "IN_PROGRESS"],
+    }[from] || [from];
+  };
   return (
     <div>
       <Heading eyebrow="DELIVERY BOARD">Tasks, without the noise.</Heading>
       <p className="text-sm text-[#77756d] mt-4">
-        Drag cards between columns or use the status menu for keyboard access.
+        {role === "TEAM_MEMBER"
+          ? "Start work, report blockers, then submit it for project-manager review."
+          : "Plan work, review submitted tasks, and approve only after review."}
       </p>
       <div className="grid xl:grid-cols-6 gap-3 overflow-x-auto pb-5 mt-8">
         {STATUSES.map((s) => (
@@ -474,7 +610,8 @@ function Board({
             onDrop={(e) => {
               e.preventDefault();
               const id = e.dataTransfer.getData("text/task-id");
-              if (id) move(id, s);
+              const task = tasks.find((item) => item.id === id);
+              if (task && permitted(task.status).includes(s)) move(id, s);
             }}
           >
             <div className="flex justify-between text-xs mb-3 px-1">
@@ -521,7 +658,7 @@ function Board({
                       onChange={(e) => move(t.id, e.target.value)}
                       className="w-full mt-4 bg-[#eee9de] rounded-lg px-2 py-2 text-[11px] outline-none"
                     >
-                      {STATUSES.map((x) => (
+                      {permitted(t.status).map((x) => (
                         <option key={x} value={x}>
                           {label(x)}
                         </option>
@@ -745,15 +882,18 @@ function Reports() {
 
 function TaskModal({
   projects,
-  users,
   close,
 }: {
   projects: Data[];
-  users: Data[];
   close: () => void;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [projectId, setProjectId] = useState(projects[0]?.id || "");
+  const selectedProject = projects.find((project) => project.id === projectId);
+  const assignees = (selectedProject?.members || [])
+    .map((member: Data) => member.user)
+    .filter((user: Data) => user.role === "TEAM_MEMBER" && user.status === "ACTIVE");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const body = Object.fromEntries(new FormData(e.currentTarget));
@@ -774,16 +914,29 @@ function TaskModal({
       <h2 className="text-2xl font-semibold">Create a task</h2>
       <form onSubmit={submit} className="mt-7 space-y-4">
         <Field name="title" label="Task title" />
-        <Select
-          name="projectId"
-          label="Project"
-          items={projects.map((p) => [p.id, p.name])}
-        />
-        <Select
-          name="assigneeId"
-          label="Assignee"
-          items={users.map((u) => [u.id, u.name])}
-        />
+        <Textarea name="description" label="Task description and acceptance criteria" />
+        <label className="block text-sm">
+          Project
+          <select
+            name="projectId"
+            value={projectId}
+            onChange={(event) => setProjectId(event.target.value)}
+            required
+            className="mt-2 w-full rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3"
+          >
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm">
+          Assignee
+          <select name="assigneeId" className="mt-2 w-full rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3">
+            <option value="">Leave unassigned</option>
+            {assignees.map((user: Data) => <option key={user.id} value={user.id}>{user.name}</option>)}
+          </select>
+          {!assignees.length && (
+            <span className="mt-2 block text-xs text-[#a0442a]">No team members are assigned to this project yet. Use “Manage team” first.</span>
+          )}
+        </label>
         <Select
           name="priority"
           label="Priority"
@@ -791,6 +944,9 @@ function TaskModal({
         />
         <Field name="estimate" label="Estimated minutes" type="number" />
         <Field name="dueDate" label="Deadline" type="date" />
+        <p className="text-xs text-[#77756d]">
+          After creating the task, open it to upload a supporting file or completion proof in the Files section.
+        </p>
         {error && <p className="text-sm text-[#a0442a]">{error}</p>}
         <Submit>Create task</Submit>
       </form>
@@ -1049,6 +1205,19 @@ function Field({
         type={type}
         required
         className="mt-2 w-full rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3 outline-none focus:ring-2 focus:ring-[#c66a31]"
+      />
+    </label>
+  );
+}
+function Textarea({ name, label: fieldLabel }: { name: string; label: string }) {
+  return (
+    <label className="block text-sm">
+      {fieldLabel}
+      <textarea
+        name={name}
+        required
+        rows={4}
+        className="mt-2 w-full resize-y rounded-xl bg-[#fbf9f3] ring-1 ring-[#d9d3c5] p-3 outline-none focus:ring-2 focus:ring-[#c66a31]"
       />
     </label>
   );

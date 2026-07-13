@@ -65,17 +65,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (
     p.data.assigneeId &&
-    !(await db.projectMember.findUnique({
+    !(await db.projectMember.findFirst({
       where: {
-        projectId_userId: {
-          projectId: p.data.projectId,
-          userId: p.data.assigneeId,
-        },
+        projectId: p.data.projectId,
+        userId: p.data.assigneeId,
+        user: { role: Role.TEAM_MEMBER, status: "ACTIVE", archivedAt: null },
       },
     }))
   )
     return NextResponse.json(
-      { error: "Assignee must be a project member" },
+      { error: "Assignee must be an active team member assigned to this project" },
       { status: 422 },
     );
   const task = await db.task.create({ data: { ...p.data, creatorId: s.id } });

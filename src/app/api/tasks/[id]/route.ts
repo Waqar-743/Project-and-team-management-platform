@@ -65,7 +65,11 @@ export async function PATCH(
     data: {
       ...p.data,
       submittedAt:
-        p.data.status === "IN_REVIEW" ? new Date() : task.submittedAt,
+        p.data.status === "IN_REVIEW"
+          ? new Date()
+          : p.data.status === "IN_PROGRESS" && task.status === "IN_REVIEW"
+            ? null
+            : task.submittedAt,
     },
   });
   await db.activity.create({

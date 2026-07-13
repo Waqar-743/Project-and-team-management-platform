@@ -16,6 +16,20 @@ export async function POST(
   const p = schema.safeParse(await req.json().catch(() => null));
   if (!p.success)
     return NextResponse.json({ error: "User required" }, { status: 422 });
+  const user = await db.user.findFirst({
+    where: {
+      id: p.data.userId,
+      role: "TEAM_MEMBER",
+      status: "ACTIVE",
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+  if (!user)
+    return NextResponse.json(
+      { error: "Only active team members can be added to a project" },
+      { status: 422 },
+    );
   await db.projectMember.upsert({
     where: { projectId_userId: { projectId: id, userId: p.data.userId } },
     create: { projectId: id, userId: p.data.userId },
@@ -55,6 +69,15 @@ export async function DELETE(
   const p = schema.safeParse(await req.json().catch(() => null));
   if (!p.success)
     return NextResponse.json({ error: "User required" }, { status: 422 });
+  const project = await db.project.findUnique({
+    where: { id },
+    select: { managerId: true },
+  });
+  if (project?.managerId === p.data.userId)
+    return NextResponse.json(
+      { error: "The project manager cannot be removed from their project" },
+      { status: 422 },
+    );
   await db.projectMember.delete({
     where: { projectId_userId: { projectId: id, userId: p.data.userId } },
   });

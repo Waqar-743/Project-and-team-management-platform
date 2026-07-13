@@ -32,13 +32,17 @@ export default async function Dashboard() {
             { memberships: { some: { projectId: { in: projectIds } } } },
           ],
         };
-  const [rawProjects, tasks, users, activities, notifications, auditCount] =
+  const [rawProjects, tasks, users, assignableUsers, activities, notifications, auditCount] =
     await Promise.all([
       db.project.findMany({
         where: { ...projectWhere, archivedAt: null },
         include: {
           manager: { select: { name: true } },
-          members: { include: { user: { select: { name: true } } } },
+          members: {
+            include: {
+              user: { select: { id: true, name: true, title: true, role: true, status: true } },
+            },
+          },
           tasks: { where: { archivedAt: null }, select: { status: true } },
           _count: { select: { tasks: { where: { archivedAt: null } } } },
         },
@@ -59,6 +63,17 @@ export default async function Dashboard() {
         select: { id: true, name: true, title: true, role: true, status: true },
         orderBy: { name: "asc" },
       }),
+      s.role === "TEAM_MEMBER"
+        ? Promise.resolve([])
+        : db.user.findMany({
+            where: {
+              role: "TEAM_MEMBER",
+              status: "ACTIVE",
+              archivedAt: null,
+            },
+            select: { id: true, name: true, title: true, role: true, status: true },
+            orderBy: { name: "asc" },
+          }),
       db.activity.findMany({
         where:
           s.role === "ADMIN"
@@ -105,6 +120,7 @@ export default async function Dashboard() {
       projects={projects}
       tasks={tasks}
       users={users}
+      assignableUsers={assignableUsers}
       activities={activities}
       notifications={notifications}
       auditCount={auditCount}
