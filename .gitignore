@@ -6,3 +6,6 @@ coverage
 *.tsbuildinfo
 public/uploads/*
 !public/uploads/.gitkeep
+
+.vercel
+.env*

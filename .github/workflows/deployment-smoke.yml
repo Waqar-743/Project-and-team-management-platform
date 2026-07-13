@@ -1,0 +1,19 @@
+name: Production smoke test
+
+on:
+  deployment_status:
+
+jobs:
+  verify-production:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url }}
+    steps:
+      - name: Verify public login page
+        run: curl --fail --silent --show-error --location "$DEPLOYMENT_URL/login" > /dev/null
+      - name: Verify backend and database
+        run: |
+          response="$(curl --fail --silent --show-error "$DEPLOYMENT_URL/api/health")"
+          echo "$response" | jq -e '.status == "ok" and .database == "connected"' > /dev/null

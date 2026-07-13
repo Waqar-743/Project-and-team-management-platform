@@ -22,6 +22,11 @@ export async function POST(
   const { id } = await params;
   if (!(await taskAccess(s, id)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (process.env.VERCEL && !process.env.BLOB_READ_WRITE_TOKEN)
+    return NextResponse.json(
+      { error: "File uploads require Vercel Blob storage in production." },
+      { status: 503 },
+    );
   const form = await req.formData();
   const file = form.get("file");
   if (!(file instanceof File) || !ALLOWED.has(file.type) || file.size > MAX)
