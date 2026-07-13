@@ -24,6 +24,15 @@ erDiagram
   TASK ||--o{ COMMENT : has
   USER ||--o{ COMMENT : writes
   USER ||--o{ ACTIVITY : performs
+  USER ||--o{ NOTIFICATION : receives
+  USER ||--o{ REFRESH_TOKEN : owns
+  USER ||--o{ AUDIT_LOG : creates
+  PROJECT ||--o{ MILESTONE : plans
+  TASK ||--o{ SUBTASK : contains
+  TASK ||--o{ TASK_DEPENDENCY : requires
+  TASK ||--o{ TIME_ENTRY : records
+  TASK ||--o{ ATTACHMENT : stores
+  TASK ||--o{ DEADLINE_EXTENSION : requests
 ```
 
 ## Use cases

@@ -1,21 +1,21 @@
 # Forge — Project & Team Task Management
 
-Forge is a full-stack, role-aware project operations platform built for the intern practical assignment. It gives administrators system visibility, project managers delivery control, and team members a focused view of assigned work.
+Forge is a full-stack, role-aware project operations platform built for the intern practical assignment. It gives administrators system access controls and audit visibility, project managers delivery and review control, and team members a focused collaboration workspace.
 
 ## Stack
 
 - Next.js 15 / React 19 / TypeScript / Tailwind CSS 4
 - Node.js REST API through Next.js route handlers
 - PostgreSQL with Prisma ORM
-- Signed JWT sessions stored in secure, HTTP-only cookies
+- Short-lived signed access sessions and rotating refresh tokens in secure, HTTP-only cookies
 - Zod validation, bcrypt password hashing, Vitest, GitHub Actions
 
 ## Quick start
 
 1. Install Node.js 20+ and PostgreSQL 15+.
-2. Copy `.env.example` to `.env` and update `DATABASE_URL` and `JWT_SECRET`.
-3. Run `npm install`.
-4. Run `npm run db:push` and `npm run db:seed`.
+2. Run `docker compose up -d` or provide any PostgreSQL 15+ database.
+3. Copy `.env.example` to `.env` and update `DATABASE_URL` and `JWT_SECRET`.
+4. Run `npm install`, `npm run db:push`, and `npm run db:seed`.
 5. Start with `npm run dev`, then open `http://localhost:3000`.
 
 Demo users share password `Forge@2026`: `admin@forge.test`, `manager@forge.test`, and `member@forge.test`.
@@ -30,6 +30,8 @@ Demo users share password `Forge@2026`: `admin@forge.test`, `manager@forge.test`
 | Update task status | Yes | Own projects | Assigned tasks |
 | Manage access | Yes | No | No |
 
+Task delivery follows Backlog → To Do → In Progress → In Review → Completed, with a separate Blocked state. Members submit work for review; managers approve or return it. Dependencies, discussions, checklists, attachments, time records, deadline requests and notifications are persisted in PostgreSQL.
+
 Authorization is enforced in server route handlers; hiding a UI control is never treated as security.
 
 ## Quality commands
@@ -42,6 +44,7 @@ Authorization is enforced in server route handlers; hiding a UI control is never
 - [Architecture and diagrams](docs/ARCHITECTURE.md)
 - [Feature completion report](docs/FEATURE_REPORT.md)
 - [QA report](docs/QA_REPORT.md)
+- [CI/CD explanation](docs/CI_CD.md)
 - [AI disclosure](docs/AI_DISCLOSURE.md)
 
 ## Deployment

@@ -1,18 +1,31 @@
-# QA report
+# QA and deployment report
 
-## Evaluation matrix
+## Automated quality gate
 
-- Functional: authentication, role-scoped data, create task and status movement covered.
-- Security: password hashes, expiring HTTP-only cookie, input validation, ownership checks, no secrets committed.
-- Data: normalized many-to-many membership, referential deletion behavior, useful task/activity indexes.
-- UX: no blue or pink; charcoal, parchment, rust and sage palette; responsive navigation; loading/error feedback; empty board states; reduced-motion support.
-- Engineering: strict TypeScript, small API surfaces, reproducible seed data and automated CI.
+GitHub Actions and local QA run Prisma generation, ESLint, strict TypeScript, Vitest, and the optimized Next.js production build. A failure stops the workflow. Tests cover request validation, authentication throttling, manager/member review boundaries, dependency blocking, and valid approval.
 
-## Manual acceptance pass
+## Executed database/API checks — 13 July 2026
 
-1. Seed and log in as each demo role.
-2. Confirm team members cannot see other users' tasks or create tasks.
-3. Confirm managers only see and modify managed projects.
-4. Create a task as manager, move it across the board, refresh, and confirm persistence.
-5. Test login error, keyboard focus, mobile widths 375/768/1440, and reduced-motion preference.
-6. Confirm production secrets and demo passwords are rotated before public deployment.
+- PostgreSQL schema synchronized and seed completed.
+- Manager login succeeded and returned exactly two managed projects and six scoped tasks.
+- Member login returned four assigned tasks.
+- Direct member attempt to mark a task Done was rejected by the backend.
+- Manager reports returned two project-health records and three workload records.
+- Member comment creation and time logging persisted successfully.
+- Refresh-token rotation succeeded.
+- Admin user creation and suspension succeeded and produced audit data.
+- Responsive browser QA at a 375 px viewport found no horizontal overflow.
+- Browser QA found and fixed locale-dependent activity-date hydration; the repaired dashboard and reports render with a clean console.
+
+## Security review
+
+- Password hashes never leave the database.
+- Access and refresh cookies are HTTP-only; production cookies are Secure.
+- Resource queries enforce ownership or membership before reads and writes.
+- Login is throttled, request bodies are validated, filenames are randomized, and uploads restrict MIME type and size.
+- Security headers deny framing, MIME sniffing, unnecessary browser capabilities, and unsafe referrer leakage.
+- No environment secrets are committed.
+
+## Deployment state
+
+The application and local PostgreSQL integration are verified. CI is configured. Public GitHub push is handled from the local repository. A public live URL still requires the repository owner to provision hosting/database environment variables. For serverless hosting, configure external object storage before enabling public file uploads.
