@@ -22,10 +22,10 @@ GitHub Actions and local QA run Prisma generation, ESLint, strict TypeScript, Vi
 - Password hashes never leave the database.
 - Access and refresh cookies are HTTP-only; production cookies are Secure.
 - Resource queries enforce ownership or membership before reads and writes.
-- Login is throttled, request bodies are validated, filenames are randomized, and uploads restrict MIME type and size.
+- Login is throttled and request bodies are validated.
 - Security headers deny framing, MIME sniffing, unnecessary browser capabilities, and unsafe referrer leakage.
 - No environment secrets are committed.
 
 ## Deployment state
 
-The application and local PostgreSQL integration are verified. CI is configured. Public GitHub push is handled from the local repository. A public live URL still requires the repository owner to provision hosting/database environment variables. For serverless hosting, configure external object storage before enabling public file uploads.
+The application and local PostgreSQL integration are verified. CI is configured. Public GitHub push is handled from the local repository. A public live URL still requires the repository owner to provision hosting/database environment variables.

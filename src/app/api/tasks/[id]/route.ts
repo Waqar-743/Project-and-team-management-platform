@@ -42,7 +42,6 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         },
-        attachments: true,
       },
     }),
   );

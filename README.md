@@ -15,7 +15,7 @@ Forge is a production-style, multi-user project operations platform. Administrat
 - User, role, project, member, milestone, and task management
 - Drag-and-drop Kanban with an accessible status-menu fallback
 - Task review, approval, return feedback, blocked work, and dependencies
-- Checklists, discussions, attachments, time entries, and deadline requests
+- Checklists, discussions, time entries, and deadline requests
 - Database-driven notifications, audit history, workload reports, and CSV export
 - Responsive role-aware dashboards with loading, empty, and error states
 - PostgreSQL/Prisma relationships, validation, soft deletion, tests, and CI
@@ -97,7 +97,6 @@ For Vercel, `DATABASE_URL` must use a publicly reachable managed PostgreSQL serv
 │   ├── schema.prisma                  # Relational data model
 │   └── seed.ts                        # Local demo accounts and data
 ├── public/
-│   └── uploads/                       # Local-development file storage
 ├── src/
 │   ├── app/
 │   │   ├── api/
@@ -167,7 +166,6 @@ All request and response bodies use JSON unless marked as multipart or CSV. Auth
 | POST | `/api/tasks/:id/time` | Task participant | Record work time |
 | POST | `/api/tasks/:id/deadline` | Task participant | Request a deadline extension |
 | PATCH | `/api/deadline-requests/:id` | Owning manager/admin | Approve or reject an extension |
-| POST | `/api/tasks/:id/attachments` | Task participant | Upload a validated file |
 | GET / PATCH | `/api/notifications` | Signed in | List or mark notifications read |
 | GET | `/api/reports?format=csv` | Signed in, scoped | Reports and CSV export |
 
@@ -205,7 +203,6 @@ erDiagram
   TASK ||--o{ SUBTASK : contains
   TASK ||--o{ TASK_DEPENDENCY : requires
   TASK ||--o{ COMMENT : discusses
-  TASK ||--o{ ATTACHMENT : stores
   TASK ||--o{ TIME_ENTRY : tracks
   TASK ||--o{ DEADLINE_EXTENSION : requests
   USER ||--o{ NOTIFICATION : receives
@@ -222,7 +219,7 @@ flowchart TB
   Manager[Project manager] --> Projects[Manage assigned projects and members]
   Manager --> Review[Assign, review and approve work]
   Member[Team member] --> Tasks[View and update assigned tasks]
-  Member --> Collaborate[Comment, upload, log time and request extensions]
+  Member --> Collaborate[Comment, log time and request extensions]
   Users --> API[Protected REST API]
   Global --> API
   Projects --> API

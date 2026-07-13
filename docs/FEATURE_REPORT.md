@@ -10,7 +10,7 @@
 | Projects | Create/update/archive projects, assign/remove members, add milestones, calculate progress and health from live task data |
 | Tasks | Create/assign/archive, priority/deadline/estimate, search/filter/pagination API, drag/drop Kanban plus accessible status menu |
 | Review workflow | Member submission to In Review, manager-only approval, return feedback field, dependency blocking |
-| Collaboration | Nested comment data model, task discussions, validated attachments and upload history, in-app notifications |
+| Collaboration | Nested comment data model, task discussions, time tracking, deadline requests and in-app notifications |
 | Planning | Subtasks/checklists, same-project dependencies, blocked state, deadline-extension request and manager response API |
 | Time and reporting | Time entries, estimated-versus-actual totals, workload, overdue/project health reporting, CSV export |
 | Resilience/UI | Loading skeletons, empty/error states, optimistic rollback, responsive layout, reduced-motion support, skip link |
@@ -18,7 +18,6 @@
 
 ## Known limitations
 
-- Attachments use validated local disk storage for a self-hosted demo. Serverless production should replace this adapter with S3, Cloudinary, or equivalent object storage.
 - User mentions are stored in comment text but are not parsed into dedicated mention records.
 - The dashboard exposes the primary workflows; milestone, dependency, member-removal, extension-review, archive, and nested-reply operations are available through REST but do not yet have dedicated dashboard panels.
 - Email/push delivery is outside scope; notifications are database-backed and in-app.

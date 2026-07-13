@@ -22,7 +22,6 @@ All requests and responses use JSON unless marked as multipart or CSV. Authentic
 | POST | `/api/tasks/:id/time` | Task participant | Record work time |
 | POST | `/api/tasks/:id/deadline` | Task participant | Request deadline extension |
 | PATCH | `/api/deadline-requests/:id` | Owning manager/admin | Approve/reject extension |
-| POST | `/api/tasks/:id/attachments` | Task participant | Multipart file upload, maximum 5 MB |
 | GET/PATCH | `/api/notifications` | Signed in | List or mark notifications read |
 | GET | `/api/reports[?format=csv]` | Signed in, scoped | Project health and workload report/export |
 

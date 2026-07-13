@@ -897,11 +897,8 @@ function TaskModal({
     .filter((user: Data) => user.role === "TEAM_MEMBER" && user.status === "ACTIVE");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const formElement = e.currentTarget;
-    const form = new FormData(formElement);
-    const body = Object.fromEntries(
-      [...form.entries()].filter(([key]) => key !== "attachment"),
-    );
+    const form = new FormData(e.currentTarget);
+    const body = Object.fromEntries(form);
     const r = await fetch("/api/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -911,20 +908,6 @@ function TaskModal({
     if (!r.ok) {
       setError(task.error);
       return;
-    }
-    const attachment = form.get("attachment");
-    if (attachment instanceof File && attachment.size > 0) {
-      const upload = await fetch(`/api/tasks/${task.id}/attachments`, {
-        method: "POST",
-        body: new FormData(formElement),
-      });
-      if (!upload.ok) {
-        setError(
-          `Task created, but the supporting file could not be uploaded: ${(await upload.json()).error}`,
-        );
-        router.refresh();
-        return;
-      }
     }
     close();
     router.refresh();
@@ -964,16 +947,6 @@ function TaskModal({
         />
         <Field name="estimate" label="Estimated minutes" type="number" />
         <Field name="dueDate" label="Deadline" type="date" />
-        <label className="block text-sm">
-          Supporting image or document <span className="text-[#77756d]">(optional)</span>
-          <input
-            name="attachment"
-            type="file"
-            accept="image/png,image/jpeg,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="mt-2 block w-full text-xs"
-          />
-          <span className="mt-2 block text-xs text-[#77756d]">PNG, JPG, PDF, TXT or DOCX · up to 5 MB</span>
-        </label>
         {error && <p className="text-sm text-[#a0442a]">{error}</p>}
         <Submit>Create task</Submit>
       </form>
@@ -995,7 +968,6 @@ function TaskDrawer({
   const [error, setError] = useState("");
   const subtasks = task?.subtasks ?? [];
   const comments = task?.comments ?? [];
-  const attachments = task?.attachments ?? [];
   const deadlineExtensions = task?.deadlineExtensions ?? [];
   const timeEntries = task?.timeEntries ?? [];
   async function reload() {
@@ -1021,18 +993,6 @@ function TaskDrawer({
     await reload();
     form.reset();
     refresh();
-  }
-  async function upload(form: HTMLFormElement) {
-    const r = await fetch(`/api/tasks/${id}/attachments`, {
-      method: "POST",
-      body: new FormData(form),
-    });
-    if (!r.ok) {
-      setError((await r.json()).error);
-      return;
-    }
-    await reload();
-    form.reset();
   }
   async function toggleSubtask(item: Data) {
     const r = await fetch(`/api/subtasks/${item.id}`, {
@@ -1198,11 +1158,11 @@ function TaskDrawer({
               </InlineForm>
             </section>
             )}
-            <section className="mt-9">
+            {false && <section className="mt-9">
               <h3 className="font-semibold">
                 {role === "TEAM_MEMBER" ? "Proof and deliverables" : "Task references"}
               </h3>
-              {attachments.map((a: Data) => (
+              {[].map((a: Data) => (
                 <a
                   className="block text-sm py-2 text-[#a85227]"
                   href={a.url}
@@ -1214,7 +1174,7 @@ function TaskDrawer({
               {role === "TEAM_MEMBER" && (
                 <InlineForm
                   button="Upload proof"
-                  onSubmit={(e) => upload(e.currentTarget)}
+                  onSubmit={() => undefined}
                 >
                   <label className="block text-sm">
                     Completion proof or supporting file
@@ -1227,7 +1187,7 @@ function TaskDrawer({
                   </label>
                 </InlineForm>
               )}
-            </section>
+            </section>}
             {role !== "TEAM_MEMBER" && deadlineExtensions.length > 0 && (
               <section className="mt-9">
                 <h3 className="font-semibold">Deadline requests</h3>
