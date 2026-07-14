@@ -240,6 +240,3 @@ The GitHub Actions quality gate runs on every push and pull request:
 
 Vercel deploys the verified `main` branch and publishes the stable URL linked at the top of this README. GitHub Pages is intentionally not used because it only serves static files and cannot run authenticated Next.js route handlers or connect to PostgreSQL.
 
-## AI usage disclosure
-
-OpenAI Codex assisted with architecture review, implementation scaffolding, Prisma modeling, UI refinement, test suggestions, documentation, and QA automation. The candidate remains responsible for reviewing, understanding, testing, and explaining the submitted implementation.
